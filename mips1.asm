@@ -487,7 +487,7 @@ loopInWeekDay:
 	blt $t0, $t2, loopInWeekDay
 
 	#gan vo a0 de tra ve
-	la $a0, weekDayName
+	la $v0, weekDayName
 
 	#load
 	lw 		$ra, ($sp)	
