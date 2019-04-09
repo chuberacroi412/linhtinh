@@ -501,3 +501,44 @@ loopInWeekDay:
 	lw 		$t0, 32($sp)
 	addi 		$sp, $sp, 36
 	jr	 	$ra
+
+#------------------------
+#Ham tim 2 nam nhuan ke tiep
+findNextLeap: # int(v0, v1) finNextLeap(char* Time(a0))
+
+	addi 		$sp, $sp, -12
+	sw 		$ra, ($sp)
+	sw 		$t0, 4($sp)
+	sw 		$t1, 8($sp)
+
+	jal 		Year		#lay cai nam ra	
+	move 		$t0, $v0	# gan nam vo t0
+	
+	#tim nam nhuan gan nhat
+firsYearLoop:
+	move 		$a0, $t0	# gan t0 vo a0 de goi ham kiem tra nam nhuan
+	jal 		LeapYear
+	move 		$t1, $v0	# lay ket qua tra ve gan vo t1
+	addi 		$t0, $t0, 1	# tang nam len 1 don vi (chu y cho nay)
+	beq 		$t1, 0, firstYearLoop # neu t1 = 0 => ko nhuan kiem tra tiep, nguoc lai nhuan -->break
+
+	addi 		$t0, $t0, -1	# do o tren auto tang nam len 1, nen khi t1 = 1 phai tru lai mot nam
+	move 		$v1, $t0	# gan ket qua vo v1
+	addi 		$t0, $t0, 1	# tang nam len 1 de kiem tra tiep, (ngay dong nay do t0 da la nam nhuan
+					# nen +4 xac suat ra nam nhuan se cao hon, nhung t ko muon dot pha :) )
+	# tim them 2 nam nhuan nua
+SecondYearLoop:	
+	move 		$a0, $t0 	#y nhu tren
+	jal 		LeapYear	
+	move 		$t1, $v0
+	addi 		$t0, $t0, 1	
+	beq 		$t1, 0, SecondYearLoop
+
+	addi $t0, $t0, -1
+	move $v0, $t0		#gan ket qua vo v0, het ham 
+
+	lw $ra, ($sp)
+	lw $t0, 4($sp)
+	lw $t1, 8($sp)
+	addi $sp, $sp, 12
+#Her ham tim 2 nam nhuan ke tiep
