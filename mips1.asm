@@ -1,10 +1,11 @@
 .data
 	weekDayName: .space 3 #dung trong ham weekday
+	temp_2: .space 20 # dung trong convert
 	ngay: .word 0
 	thang: .word 0
 	nam: .word 0
 	days_in_month: .word 31,28,31,30,31,30,31,31,30,31,30,31 #dung de kiem tra tinh hop le
-	
+	length_of_month_string: .byte 7, 8, 5, 5, 3, 4, 4, 6, 9, 7, 8, 8 #do dai chuoi ki tu cua cac thang, dung trong convert.C
 	
 	week: .byte 'M','o','n',' ',' ','T','u','e','s',' ','W','e','d',' ',' ','T','h','u','e','s','F','r','i',' ',' ','S','a','t',' ',' ','S','u','n',' ',' '
 	# thong bao
@@ -22,6 +23,19 @@
 	tbKoNhuan: .asciiz "\nNam khong nhuan"
 
 	ketqua: .asciiz "\nKet qua: "
+# month
+    jan: .asciiz "January"
+    feb: .asciiz "February"
+    mar: .asciiz "March"
+    apr: .asciiz "April"
+    may: .asciiz "May"
+    jun: .asciiz "June"
+    jul: .asciiz "July"
+    aug: .asciiz "August"
+    sep: .asciiz "September"
+    oct: .asciiz "October"
+    nov: .asciiz "November"
+    dec: .asciiz "December"
 	
 	#Nho doc nguyen mau ham truoc khi goi, vi mot so ham tra ra tham so de tien cho viec tai su dung
 
@@ -139,7 +153,7 @@ Exit:
 	#lw 		$s2, nam
 	#jal 		kiemTraHopLe
 #Ham kiemTraHopLe
-checkInputData: #bool(v0) kiemTraHopLe(int ngay(a0),int thang(a1), int nam(a2))
+checkInputData: #bool(v0) kiemTraHopLe(char* time(a0))
 	#backup
 	addi 		$sp, $sp, -24
 	sw 		$ra, ($sp)
@@ -148,11 +162,14 @@ checkInputData: #bool(v0) kiemTraHopLe(int ngay(a0),int thang(a1), int nam(a2))
 	sw 		$s0, 12($sp)
 	sw		$s1, 16($sp)
 	sw		$s2, 20($sp)	
-
+	
+	jal Day
 	#load vao cac bien tam
-	move 		$a0, $s0
-	move 		$a1, $s1
-	move 		$a2, $s2
+	move 		$s0, $v0
+	jal Month
+	move 		$s1, $v0
+	jal Year
+	move 		$s2, $v0
 	#kiem tra nam
 	blt 		$s2, 1, dataError		 # nam < 1 => sai
 
@@ -174,7 +191,7 @@ checkInputData: #bool(v0) kiemTraHopLe(int ngay(a0),int thang(a1), int nam(a2))
 	j		dataCorrect
 
 Feb:
-	jal	 	kiemTraNamNhuan
+	jal	 	LeapYear
 	beq 		$t1, 1, Feb_Nhuan 		#t1 = true la nam nhuan
 	#neu ko nhuan
 	bgt 		$s0, 28, dataError 		# ngay > 28 => sai
@@ -378,7 +395,7 @@ monthCaculateLoop:
 	add 		$s3, $s3, $t2 
 	
 	#sau khi chay loop xong, neu nam nhuan va thang > 2 thi phai cong them 1 ngay la ngay 29 vo
-	jal 		kiemTraNamNhuan 
+	jal 		LeapYear
 	beq 		$t1, 0, yearCaculate 	#neu t1 = 0 => ko nhuan => nhay  vo cong nam
 	ble 		$s1, 2, yearCaculate 	#neu thang <= 2 ---> chua qua thang 2, => ko can cong vo => nhay vo cong nam
 	addi 		$s3, $s3, 1
@@ -501,7 +518,6 @@ loopInWeekDay:
 	lw 		$t0, 32($sp)
 	addi 		$sp, $sp, 36
 	jr	 	$ra
-
 #------------------------
 #Ham tim 2 nam nhuan ke tiep
 findNextLeap: # int(v0, v1) finNextLeap(char* Time(a0))
@@ -515,7 +531,7 @@ findNextLeap: # int(v0, v1) finNextLeap(char* Time(a0))
 	move 		$t0, $v0	# gan nam vo t0
 	
 	#tim nam nhuan gan nhat
-firsYearLoop:
+firstYearLoop:
 	move 		$a0, $t0	# gan t0 vo a0 de goi ham kiem tra nam nhuan
 	jal 		LeapYear
 	move 		$t1, $v0	# lay ket qua tra ve gan vo t1
@@ -542,3 +558,222 @@ SecondYearLoop:
 	lw $t1, 8($sp)
 	addi $sp, $sp, 12
 #Her ham tim 2 nam nhuan ke tiep
+Convert:
+    # $a0 - TIME
+    # $a1 - type
+    # khong co return, thay doi truc tiep tren $a0
+    addi    $sp, $sp, -50
+	sw 	$t0, 46($sp)
+	sw 	$t1, 44($sp)
+	sw 	$t2, 40($sp)
+	sw 	$t3, 36($sp)
+	sw 	$t4, 32($sp)
+    sw      $ra, 28($sp)
+    sw      $a0, 24($sp)
+    sw      $a1, 20($sp)
+
+    beq     $a1, 65, Convert.A      # 'A' = 65
+    beq     $a1, 66, Convert.B      # 'B' = 66
+    beq     $a1, 67, Convert.C      # 'C' = 67
+
+    Convert.A: # MM/DD/YYYY
+    # doi cho MM va DD
+    lb		$t0, 0($a0)		 
+    lb		$t1, 1($a0)		 
+    lb      $t2, 3($a0)       
+    lb      $t3, 4($a0)       
+
+    sb      $t2, 0($a0)		
+    sb      $t3, 1($a0)		
+    sb      $t0, 3($a0)		
+    sb      $t1, 4($a0)
+    j       Convert.end
+
+    Convert.B: # Month DD, YYYY
+
+    # lay thang va chuyen sang chuoi Month
+    jal     Month
+    move    $a0, $v0
+    jal     month_to_string
+    sw      $v0, 16($sp)    # luu Month trong stack
+
+    # copy phan DD, YYYY vao temp_2
+    lw      $t0, 24($sp)
+    la      $t1, temp_2
+    li      $t2, 32 # 32 = ' '
+    sb      $t2, 0($t1)
+    lb      $t2, 0($t0)
+    sb      $t2, 1($t1)
+    lb      $t2, 1($t0)
+    sb      $t2, 2($t1)
+    li      $t2, 44  # 44 = ','
+    sb      $t2, 3($t1)
+    li      $t2, 32
+    sb      $t2, 4($t1)
+    lb      $t2, 6($t0)
+    sb      $t2, 5($t1)
+    lb      $t2, 7($t0)
+    sb      $t2, 6($t1)
+    
+    lb      $t2, 8($t0)
+    sb      $t2, 7($t1)
+    lb      $t2, 9($t0)
+    sb      $t2, 8($t1)
+    li      $t2, 0
+    sb      $t2, 9($t1)
+
+    lw      $a0, 24($sp)
+    lw      $a1, 16($sp)
+    jal     strcpy
+    la      $a1, temp_2
+    jal     strcpy
+    
+	#DD month, YYYY
+    Convert.C:
+	move 	$t0, $a0	# chep dia chi tu a0 vao t0
+	move 	$s1, $a0 	# dung s1 de luu vinh vien dia chi a0, tranh truong hop goi ham lung tung a0 bi ghi de
+	la 	$s0, temp_2	# load dia chi temp_2 vao s0
+
+	#chep YYYY vao tenp_2
+	lb	$t1, 6($t0)
+	sb 	$t1, 0($s0)
+	lb 	$t1, 7($t0)
+	sb 	$t1, 1($s0)
+	lb 	$t1, 8($t0)
+	sb 	$t1, 2($s0)
+	lb 	$t1, 9($t0)
+	sb 	$t1, 3($s0)
+	lb 	$t1, 10($t0)
+	sb 	$t1, 4($s0)
+	
+	jal     Month #lay gia tri int cua thang
+	move 	$t1, $v0 # gan vao t0
+	addi 	$t1, $t1, -1 # tru di 1 de truy xuat vo cai length_of_month_string
+	lb 	$t2, length_of_month_string($t1) # gan do dai chuoi thang vao t2
+
+   	move    $a0, $v0
+   	jal     month_to_string
+	move 	$t1, $v0 # gan dia chia cua cai chuoi thang vo t1
+
+	#bat dau chinh tren a0
+	#2 ki tu dau la DD giu nguyen, tiep theo la ki tu khoang trang
+	move $t4, $s1
+	addi $t4, $t4, 2 # doi len vi tri can them khoang trong
+	li $t0, ' '
+	sb $t0, ($t4)
+	addi $t4, $t4, 1 # tang len 1 don vi nua de vo vong lap
+
+
+	li $t3, 0 # t3 = i = 0 dung de chay loop
+addMonthLoop:
+	lb $t0, ($t1)
+	sb $t0, ($t4)
+	addi $t1, $t1, 1 #tang vi tri chuoi thang
+	addi $t4, $t4, 1 #tang vi tri chuoi tra ra
+	addi $t3, $t3, 1 #tang bien dem
+	blt $t3, $t2, addMonthLoop
+
+	#add xong thang vo chuoi, gio toi dau ',' va cai nam
+	li $t0, ','
+	sb $t0, ($t4) 
+	addi $t4, $t4, 1	
+
+	li $t3, 0 # t3 = i = 0 dung de chay loop
+addYearLoop:
+	lb $t0, ($s0) # nhac lai  la s0 la con luu dia chi temp_2 chua gia tri cua YYYY
+	sb $t0, ($t4)
+	addi $t4, $t4, 1
+	addi $s0, $s0, 1
+	addi $t3, $t3, 1 
+	blt $t3, 4, addYearLoop
+
+	#xong gan dia chi s1 vo v0 la tra ra
+	move $v0, $s1
+
+    Convert.end:
+      
+	lw 	$t0, 46($sp)
+	lw 	$t1, 44($sp)
+	lw 	$t2, 40($sp)
+	lw 	$t3, 36($sp)
+	lw 	$t4, 32($sp)
+    lw      $ra, 28($sp)
+    lw      $a0, 24($sp)
+    lw      $a1, 20($sp)
+	addi    $sp, $sp, 50
+    jr      $ra
+month_to_string:
+    # $a0 - month kieu int
+    # $v0 - month kieu tring
+    beq     $a0,1,month_to_string.jan
+    beq     $a0,2,month_to_string.feb
+    beq     $a0,3,month_to_string.mar
+    beq     $a0,4,month_to_string.apr
+    beq     $a0,5,month_to_string.may
+    beq     $a0,6,month_to_string.jun
+    beq     $a0,7,month_to_string.jul
+    beq     $a0,8,month_to_string.aug
+    beq     $a0,9,month_to_string.sep
+    beq     $a0,10,month_to_string.oct
+    beq     $a0,11,month_to_string.nov
+    beq     $a0,12,month_to_string.dec
+month_to_string.jan:
+    la      $v0, jan
+    j       month_to_string.end
+month_to_string.feb:
+    la      $v0, feb
+    j       month_to_string.end
+month_to_string.mar:
+    la      $v0, mar
+    j       month_to_string.end
+month_to_string.apr:
+    la      $v0, apr
+    j       month_to_string.end
+month_to_string.may:
+    la      $v0, may
+    j       month_to_string.end
+month_to_string.jun:
+    la      $v0, jun
+    j       month_to_string.end
+month_to_string.jul:
+    la      $v0, jul
+    j       month_to_string.end
+month_to_string.aug:
+    la      $v0, aug
+    j       month_to_string.end
+month_to_string.sep:
+    la      $v0, sep
+    j       month_to_string.end
+month_to_string.oct:
+    la      $v0, oct
+    j       month_to_string.end
+month_to_string.nov:
+    la      $v0, nov
+    j       month_to_string.end
+month_to_string.dec:
+    la      $v0, dec
+month_to_string.end:
+    jr      $ra
+
+
+strcpy:
+    # $a0:  chuoi dich
+    # $a1: chuoi nguon
+    # khong return
+    addi    $sp, $sp, -8
+    sw      $ra, 4($sp)
+    sw      $t1, 0($sp)
+strcpy.loop:
+    lb      $t1, 0($a1)
+    sb      $t1, 0($a0)
+    beq     $t1, $zero, strcpy.end
+    addi    $a0, $a0, 1
+    addi    $a1, $a1, 1
+    j       strcpy.loop
+strcpy.end:
+    lw      $ra, 4($sp)
+    lw      $t1, 0($sp)
+    addi    $sp, $sp, 8
+
+    jr      $ra
+
